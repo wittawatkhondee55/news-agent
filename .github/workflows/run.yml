@@ -4,9 +4,10 @@ name: news-agent
 # repo root = โฟลเดอร์นี้ (news-agent/) ดังนั้นไฟล์ทั้งหมดอยู่ที่ root ไม่มี subdir
 on:
   schedule:
-    # ทุก 30 นาที (cron ของ GitHub Actions เป็น UTC, ขั้นต่ำ 5 นาที)
-    # ช่วงข่าวสำคัญใช้ run-fast.yml เร่งเป็นทุก 5 นาที (smart polling)
-    - cron: "*/30 * * * *"
+    # ทุก 5 นาที — เป็นไปได้เพราะ repo เป็น public (Actions ฟรีไม่จำกัด)
+    # dedup กันข่าวซ้ำ จึงจ่าย API เฉพาะข่าวใหม่ ไม่ขึ้นกับความถี่ที่เช็ค
+    # Opus-upgrade ช่วงข่าวสำคัญยังทำงานในโค้ด (events.json) — ไม่ต้องใช้ run-fast แล้ว
+    - cron: "*/5 * * * *"
   workflow_dispatch:      # ปุ่มรัน manual + กำหนดจำนวนข่าวได้ (ทดสอบ)
     inputs:
       max_per_run:
