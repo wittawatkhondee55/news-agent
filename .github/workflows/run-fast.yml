@@ -3,13 +3,17 @@ name: news-agent-fast
 # Smart polling: เร่งความถี่เป็นทุก 5 นาที "เฉพาะ" ช่วง ±10 นาทีรอบเหตุการณ์
 # สำคัญใน events.json (Fed/กนง./CPI ฯลฯ) นอกช่วงนั้น gate job จะจบทันทีโดยไม่ดึงข่าว
 #
-# หมายเหตุต้นทุน: cron */5 ทำให้ workflow ถูกเรียก 288 ครั้ง/วัน แต่ส่วนใหญ่จบที่
-# gate (~15 วินาที, ไม่ลง dependency). ถ้าเป็น private repo ที่กังวลโควต้า 2,000
-# นาที/เดือน แนะนำให้แคบ cron ลงเหลือเฉพาะวัน/ชั่วโมงที่มี event จริง หรือทำ repo
-# เป็น public (Actions ฟรีไม่จำกัด)
+# !! ต้นทุน !! GitHub Actions คิดเงินขั้นต่ำ 1 นาที/job (ปัดขึ้น) ดังนั้น cron */5
+# = 288 job/วัน = ~8,640 นาที/เดือน ซึ่งทะลุโควต้าฟรี 2,000 นาทีของ private repo
+# >>> โดยดีฟอลต์จึง "ปิด" schedule อัตโนมัติไว้ ใช้ manual trigger แทน <<<
+#
+# วิธีเปิดใช้ smart-polling อัตโนมัติ (เลือกอย่างใดอย่างหนึ่ง):
+#   1) ทำ repo เป็น public -> Actions ฟรีไม่จำกัด -> uncomment schedule ด้านล่างได้เลย
+#   2) คง private -> วันที่มี event จริง กดรัน workflow นี้แบบ manual (Run workflow)
+#      หรือ uncomment schedule ชั่วคราวเฉพาะวันนั้นแล้วปิดกลับ
 on:
-  schedule:
-    - cron: "*/5 * * * *"
+  # schedule:
+  #   - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:

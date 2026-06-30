@@ -22,7 +22,8 @@ fetch_news → dedupe → router → agent_thai / agent_foreign → notify (Tele
 ## Smart polling (ช่วงข่าวสำคัญ)
 
 - `events.json` เก็บเหตุการณ์ high-impact (Fed/กนง./CPI) เป็นเวลา UTC
-- ช่วง ±10 นาทีรอบเหตุการณ์: `run-fast.yml` เร่งดึงข่าวเป็นทุก 5 นาที และ `main.py` สลับไปใช้ **Opus** อัตโนมัติเพื่อคุณภาพสูงสุด นอกช่วงนั้น gate job จบทันที (ประหยัด Actions minutes)
+- ช่วง ±10 นาทีรอบเหตุการณ์: `main.py` สลับไปใช้ **Opus** อัตโนมัติเพื่อคุณภาพสูงสุด (ทำงานในรอบ 30 นาทีปกติ — ฟรี อยู่ในโค้ด)
+- `run-fast.yml` เร่งดึงข่าวเป็นทุก 5 นาที — **ปิด schedule อัตโนมัติไว้โดยดีฟอลต์** เพราะ GitHub คิดขั้นต่ำ 1 นาที/job ปัดขึ้น (`*/5` = ~8,640 นาที/เดือน เกินโควต้าฟรี private 2,000 นาที) เปิดใช้โดย: ทำ repo เป็น public แล้ว uncomment cron, หรือกด Run workflow เองวันที่มี event
 - อัปเดตปฏิทินเองได้ที่ `events.json`
 
 ## ติดตั้ง & รัน local
