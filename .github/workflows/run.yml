@@ -1,0 +1,52 @@
+name: news-agent
+
+# ดึงข่าว -> วิเคราะห์ -> แจ้งเตือน Telegram ตามรอบ
+# repo root = โฟลเดอร์นี้ (news-agent/) ดังนั้นไฟล์ทั้งหมดอยู่ที่ root ไม่มี subdir
+on:
+  schedule:
+    # ทุก 30 นาที (cron ของ GitHub Actions เป็น UTC, ขั้นต่ำ 5 นาที)
+    # ช่วงข่าวสำคัญใช้ run-fast.yml เร่งเป็นทุก 5 นาที (smart polling)
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}   # ปุ่มรัน manual
+
+# ต้องมีสิทธิ์เขียน เพื่อ commit processed_news.json กลับ (ให้ dedupe จำข้ามรอบ)
+permissions:
+  contents: write
+
+concurrency:
+  group: news-agent
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+        run: python main.py
+
+      - name: Persist processed_news.json
+        run: |
+          if ! git diff --quiet processed_news.json; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add processed_news.json
+            git commit -m "chore: update processed_news.json [skip ci]"
+            git push
+          else
+            echo "processed_news.json ไม่เปลี่ยน — ไม่ต้อง commit"
+          fi

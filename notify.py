@@ -1,0 +1,95 @@
+"""ส่งสรุปข่าวเข้า Telegram ผ่าน Bot API sendMessage"""
+from __future__ import annotations
+
+import os
+import html
+import logging
+
+import requests
+
+log = logging.getLogger("notify")
+
+TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
+MAX_LEN = 4096  # Telegram จำกัดความยาวข้อความต่อข้อความ
+REQUEST_TIMEOUT = 20
+
+
+def _config() -> tuple[str, str]:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    return token, chat_id
+
+
+def is_configured() -> bool:
+    token, chat_id = _config()
+    return bool(token and chat_id)
+
+
+def format_message(item: dict, analysis: str) -> str:
+    """จัดรูปข้อความเป็น HTML สำหรับ Telegram"""
+    title = html.escape(item.get("title", ""))
+    source = html.escape(item.get("source", ""))
+    link = item.get("link", "")
+    body = html.escape(analysis)
+
+    lines = [f"📰 <b>{title}</b>", f"<i>({source})</i>", "", body]
+    if link:
+        lines.append("")
+        lines.append(f'🔗 <a href="{html.escape(link)}">อ่านข่าวเต็ม</a>')
+    msg = "\n".join(lines)
+    if len(msg) > MAX_LEN:
+        msg = msg[: MAX_LEN - 1] + "…"
+    return msg
+
+
+def send_telegram(text: str) -> bool:
+    """ส่งข้อความ HTML เข้า Telegram — คืน True ถ้าสำเร็จ"""
+    token, chat_id = _config()
+    if not (token and chat_id):
+        log.warning("Telegram not configured (missing token/chat_id) — skip send")
+        return False
+    try:
+        resp = requests.post(
+            TELEGRAM_API.format(token=token),
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        ok = resp.json().get("ok", False)
+        if not ok:
+            log.error("Telegram API returned not-ok: %s", resp.text)
+        return bool(ok)
+    except Exception as exc:
+        log.error("send_telegram error: %s", exc)
+        return False
+
+
+def notify(item: dict, analysis: str) -> bool:
+    return send_telegram(format_message(item, analysis))
+
+
+if __name__ == "__main__":
+    import sys
+
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    logging.basicConfig(level=logging.INFO)
+    demo_item = {
+        "title": "ทดสอบส่งข่าวเข้า Telegram",
+        "source": "prachachat.net",
+        "link": "https://www.prachachat.net",
+    }
+    demo_analysis = "นี่คือข้อความทดสอบ\nหมายเหตุ: นี่เป็นเพียงการวิเคราะห์เบื้องต้น ไม่ใช่คำแนะนำการลงทุน"
+    print("--- ตัวอย่างข้อความที่จะส่ง ---")
+    print(format_message(demo_item, demo_analysis))
+    print("--- ผลส่งจริง ---")
+    print("configured:", is_configured())
+    if is_configured():
+        print("sent:", notify(demo_item, demo_analysis))

@@ -1,0 +1,6 @@
+# บังคับ LF เพื่อให้ shell script ใน workflow ทำงานบน Ubuntu ได้ถูกต้อง
+* text=auto eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf

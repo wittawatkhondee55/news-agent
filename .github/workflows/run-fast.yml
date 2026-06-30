@@ -1,0 +1,71 @@
+name: news-agent-fast
+
+# Smart polling: เร่งความถี่เป็นทุก 5 นาที "เฉพาะ" ช่วง ±10 นาทีรอบเหตุการณ์
+# สำคัญใน events.json (Fed/กนง./CPI ฯลฯ) นอกช่วงนั้น gate job จะจบทันทีโดยไม่ดึงข่าว
+#
+# หมายเหตุต้นทุน: cron */5 ทำให้ workflow ถูกเรียก 288 ครั้ง/วัน แต่ส่วนใหญ่จบที่
+# gate (~15 วินาที, ไม่ลง dependency). ถ้าเป็น private repo ที่กังวลโควต้า 2,000
+# นาที/เดือน แนะนำให้แคบ cron ลงเหลือเฉพาะวัน/ชั่วโมงที่มี event จริง หรือทำ repo
+# เป็น public (Actions ฟรีไม่จำกัด)
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: news-agent          # ใช้ group เดียวกับ run.yml กันรันชนกัน
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      in_window: ${{ steps.check.outputs.in_window }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: check
+        # events.py ใช้ stdlib ล้วน ไม่ต้อง pip install -> เร็ว/ถูก
+        run: |
+          if python -c "import events,sys; sys.exit(0 if events.is_high_impact_window() else 1)"; then
+            echo "in_window=true" >> "$GITHUB_OUTPUT"
+            echo "อยู่ในช่วงข่าวสำคัญ -> จะรัน pipeline"
+          else
+            echo "in_window=false" >> "$GITHUB_OUTPUT"
+            echo "นอกช่วงข่าวสำคัญ -> ข้าม"
+          fi
+
+  run:
+    needs: gate
+    if: needs.gate.outputs.in_window == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run pipeline (high-impact window)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          HIGH_IMPACT_MODEL: ${{ vars.HIGH_IMPACT_MODEL }}
+        run: python main.py
+      - name: Persist processed_news.json
+        run: |
+          if ! git diff --quiet processed_news.json; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add processed_news.json
+            git commit -m "chore: update processed_news.json [skip ci]"
+            git push
+          fi

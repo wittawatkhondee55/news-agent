@@ -1,0 +1,8 @@
+{
+  "window_minutes": 10,
+  "events": [
+    {"datetime_utc": "2026-07-29T18:00:00Z", "label": "FOMC ประกาศอัตราดอกเบี้ย Fed", "impact": "high"},
+    {"datetime_utc": "2026-08-13T07:00:00Z", "label": "กนง. ธปท. ประกาศอัตราดอกเบี้ยนโยบาย", "impact": "high"},
+    {"datetime_utc": "2026-07-15T12:30:00Z", "label": "US CPI เงินเฟ้อสหรัฐ", "impact": "high"}
+  ]
+}
