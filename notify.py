@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import html
 import logging
 
@@ -25,12 +26,31 @@ def is_configured() -> bool:
     return bool(token and chat_id)
 
 
+def _md_to_telegram_html(text: str) -> str:
+    """แปลง Markdown ที่โมเดลอาจหลุดมา -> Telegram HTML (ตาข่ายกันพลาด)
+
+    ทำ html.escape ก่อน แล้วค่อยแปลงสัญลักษณ์ markdown ที่เหลือ เพื่อให้ปลอดภัย
+    จาก <, >, & ที่อาจอยู่ในเนื้อข่าว
+    """
+    text = html.escape(text)
+    # **bold** หรือ __bold__ -> <b>bold</b>
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text, flags=re.S)
+    text = re.sub(r"__(.+?)__", r"<b>\1</b>", text, flags=re.S)
+    # หัวข้อ markdown (#, ##, ...) ต้นบรรทัด -> ตัวหนา
+    text = re.sub(r"(?m)^\s*#{1,6}\s*(.+?)\s*$", r"<b>\1</b>", text)
+    # bullet '* ' หรือ '- ' ต้นบรรทัด -> •
+    text = re.sub(r"(?m)^\s*[\*\-]\s+", "• ", text)
+    # ลบ * หรือ _ เดี่ยวๆ ที่หลงเหลือ (italic) ออกเพื่อความสะอาด
+    text = text.replace("*", "")
+    return text
+
+
 def format_message(item: dict, analysis: str) -> str:
     """จัดรูปข้อความเป็น HTML สำหรับ Telegram"""
     title = html.escape(item.get("title", ""))
     source = html.escape(item.get("source", ""))
     link = item.get("link", "")
-    body = html.escape(analysis)
+    body = _md_to_telegram_html(analysis)
 
     lines = [f"📰 <b>{title}</b>", f"<i>({source})</i>", "", body]
     if link:
