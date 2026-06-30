@@ -7,7 +7,12 @@ on:
     # ทุก 30 นาที (cron ของ GitHub Actions เป็น UTC, ขั้นต่ำ 5 นาที)
     # ช่วงข่าวสำคัญใช้ run-fast.yml เร่งเป็นทุก 5 นาที (smart polling)
     - cron: "*/30 * * * *"
-  workflow_dispatch: {}   # ปุ่มรัน manual
+  workflow_dispatch:      # ปุ่มรัน manual + กำหนดจำนวนข่าวได้ (ทดสอบ)
+    inputs:
+      max_per_run:
+        description: "จำนวนข่าวสูงสุดต่อรอบ (เว้นว่าง = ค่าเริ่มต้น 20)"
+        required: false
+        default: ""
 
 # ต้องมีสิทธิ์เขียน เพื่อ commit processed_news.json กลับ (ให้ dedupe จำข้ามรอบ)
 permissions:
@@ -37,6 +42,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          MAX_PER_RUN: ${{ github.event.inputs.max_per_run }}
         run: python main.py
 
       - name: Persist processed_news.json

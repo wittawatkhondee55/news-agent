@@ -21,7 +21,8 @@ import agent_thai
 import agent_foreign
 
 # จำนวนข่าวสูงสุดที่ประมวลผลต่อรอบ (กันค่าใช้จ่าย/สแปมตอนรอบแรกที่ข่าวเยอะ)
-MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "20"))
+# ใช้ `or "20"` เพื่อกันกรณี env ถูกตั้งเป็นค่าว่าง (เช่น scheduled run ที่ไม่มี input)
+MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN") or "20")
 
 # โมเดลที่ใช้ช่วงข่าว high-impact (ตาม spec: สลับไป Opus เฉพาะข่าวสำคัญ)
 HIGH_IMPACT_MODEL = os.environ.get("HIGH_IMPACT_MODEL", "claude-opus-4-8")
