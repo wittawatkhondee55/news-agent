@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 import html
 import logging
 
@@ -62,8 +63,12 @@ def format_message(item: dict, analysis: str) -> str:
     return msg
 
 
-def send_telegram(text: str) -> bool:
-    """ส่งข้อความ HTML เข้า Telegram — คืน True ถ้าสำเร็จ"""
+def send_telegram(text: str, _retry: bool = True) -> bool:
+    """ส่งข้อความ HTML เข้า Telegram — คืน True ถ้าสำเร็จ
+
+    ถ้าโดน rate-limit (429) จะรอตามเวลาที่ Telegram บอก (retry_after) แล้วลองใหม่
+    อีกครั้งเดียว (กันข่าวหายตอนปริมาณต่อรอบพุ่งสูง)
+    """
     token, chat_id = _config()
     if not (token and chat_id):
         log.warning("Telegram not configured (missing token/chat_id) — skip send")
@@ -79,6 +84,11 @@ def send_telegram(text: str) -> bool:
             },
             timeout=REQUEST_TIMEOUT,
         )
+        if resp.status_code == 429 and _retry:
+            retry_after = resp.json().get("parameters", {}).get("retry_after", 3)
+            log.warning("Telegram rate-limited — รอ %ss แล้วลองใหม่", retry_after)
+            time.sleep(retry_after + 0.5)
+            return send_telegram(text, _retry=False)
         resp.raise_for_status()
         ok = resp.json().get("ok", False)
         if not ok:

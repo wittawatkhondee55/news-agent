@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 import logging
 
 import fetch_news
@@ -20,9 +21,15 @@ import events
 import agent_thai
 import agent_foreign
 
-# จำนวนข่าวสูงสุดที่ประมวลผลต่อรอบ (กันค่าใช้จ่าย/สแปมตอนรอบแรกที่ข่าวเยอะ)
-# ใช้ `or "20"` เพื่อกันกรณี env ถูกตั้งเป็นค่าว่าง (เช่น scheduled run ที่ไม่มี input)
-MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN") or "20")
+# เพดานกันการวิ่งเสียการควบคุม ไม่ใช่การจำกัดปริมาณข่าวจริง (ใช้ Haiku ต้นทุนต่ำ
+# จึงไม่จำกัดปริมาณตามที่ต้องการ) — แหล่งจริงรวมกันไม่เกิน ~150 ข่าว/รอบ จึงไม่มี
+# ทางแตะเพดานนี้ในทางปฏิบัติ ใช้ `or "300"` กัน env ถูกตั้งเป็นค่าว่าง
+MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN") or "300")
+
+# เว้นจังหวะระหว่างส่งแต่ละข้อความเข้า Telegram กันโดน rate-limit (429) เมื่อ
+# ปริมาณข่าวต่อรอบพุ่งสูง (เช่นวันที่ SET มีข่าวเยอะ) — Telegram แนะนำไม่เกิน
+# ~1 ข้อความ/วินาทีต่อแชตเดียวกัน
+TELEGRAM_SEND_INTERVAL_SEC = 1.1
 
 # โมเดลที่ใช้ช่วงข่าว high-impact (ตาม spec: สลับไป Opus เฉพาะข่าวสำคัญ)
 HIGH_IMPACT_MODEL = os.environ.get("HIGH_IMPACT_MODEL", "claude-opus-4-8")
@@ -103,6 +110,7 @@ def run(dry_run: bool = False) -> int:
             ok = True
         else:
             ok = notify.notify(it, analysis)
+            time.sleep(TELEGRAM_SEND_INTERVAL_SEC)  # เว้นจังหวะกัน Telegram 429
 
         if ok:
             sent_items.append(it)
