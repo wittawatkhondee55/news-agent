@@ -129,6 +129,22 @@ def fetch_rss(name: str, url: str) -> list[dict[str, Any]]:
     return items
 
 
+# หัวข้อข่าว SET ที่เป็น filing รายงาน/ธุรการตามรอบ ไม่มีนัยสำคัญต่อราคาหุ้น —
+# ตรวจสอบจากตัวอย่างจริง (ก.ค. 2569) พบว่าราว 3 ใน 4 ของข่าว SET ต่อวันเป็น
+# ประเภทนี้ (SEC สรุปฟอร์มรายวัน, TSD รับจดทะเบียน DW, รายงานความคืบหน้าตามรอบ)
+SET_NOISE_PATTERNS = [
+    "การรับเป็นนายทะเบียนหลักทรัพย์",  # TSD แจ้งรับจดทะเบียน DW/ตราสารอนุพันธ์ (ธุรการล้วน)
+    "SEC News :",                       # SEC สรุปแบบฟอร์มรายวัน (แบบ 59/246-2 ฯลฯ)
+    "รายงานการใช้เงินเพิ่มทุน",         # รายงานความคืบหน้าใช้เงินเพิ่มทุนตามกำหนด (ธุรการ)
+    "แบบรายงานผลการซื้อหุ้นคืน",       # รายงานผลซื้อหุ้นคืนที่ทำต่อเนื่อง (ไม่ใช่ประกาศโครงการใหม่)
+    "แบบรายงานผลการใช้สิทธิ",          # รายงานผลใช้สิทธิ warrant/แปลงสภาพตามรอบ (ธุรการ)
+]
+
+
+def _is_set_noise(headline: str) -> bool:
+    return any(p in headline for p in SET_NOISE_PATTERNS)
+
+
 def fetch_set_news() -> list[dict[str, Any]]:
     """ดึงข่าวบริษัทจดทะเบียนจากหน้า SET (best-effort)
 
@@ -153,11 +169,15 @@ def fetch_set_news() -> list[dict[str, Any]]:
         return []
 
     items: list[dict[str, Any]] = []
+    noise_count = 0
     for row in rows[:MAX_ITEMS_PER_SOURCE]:
         if not isinstance(row, dict):
             continue
         title = _clean(row.get("headline") or row.get("name"))
         if not title:
+            continue
+        if _is_set_noise(title):
+            noise_count += 1
             continue
         symbol = row.get("symbol", "")
         items.append(
@@ -169,7 +189,7 @@ def fetch_set_news() -> list[dict[str, Any]]:
                 "published": row.get("datetime", ""),
             }
         )
-    log.info("fetch_set_news -> %d items", len(items))
+    log.info("fetch_set_news -> %d items (กรองข่าวธุรการออก %d)", len(items), noise_count)
     return items
 
 
